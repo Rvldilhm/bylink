@@ -6,19 +6,13 @@
 /* Comment this out to disable prints and save space */
 #define BLYNK_PRINT Serial
 
-
-/* 
-   This is an ESP32 program for controlling a relay and monitoring temperature and humidity
-   using the Blynk app.
-*/
-
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <BlynkSimpleEsp32.h>
 #include <DHT.h>
 
-char ssid[] = "ELIN";
-char pass[] = "@polije.ac.id";
+char ssid[] = "Minta izin dulu";
+char pass[] = "rivaldiilham";
 
 #define DHTPIN 4
 #define DHTTYPE DHT11
@@ -26,19 +20,17 @@ char pass[] = "@polije.ac.id";
 DHT dht(DHTPIN, DHTTYPE);
 BlynkTimer timer;
 
-bool modeAuto = false;
-bool relay = false;
+bool autoMode = false;
+int temperatureThreshold = 90; // Initial temperature threshold
+int ledPin = 5; // Pin connected to the LED
 
 BLYNK_WRITE(V0) {
   int value = param.asInt();
   Blynk.virtualWrite(V1, value);
   Serial.println(value);
-  if (value == 0 && modeAuto == false) {
-    digitalWrite(5, LOW);
-    relay = false;
-  } else if (value == 1 && modeAuto == false) {
-    digitalWrite(5, HIGH);
-    relay = true;
+  if (!autoMode) {
+    // In manual mode, use the button (V0) to control the LED
+    digitalWrite(ledPin, value == 1);
   }
 }
 
@@ -46,7 +38,20 @@ BLYNK_WRITE(V6) {
   int value = param.asInt();
   Blynk.virtualWrite(V7, value);
   Serial.println(value);
-  modeAuto = (value == 1);
+  autoMode = (value == 1);
+  if (autoMode) {
+    // In auto mode, update the LED state based on the temperature threshold
+    updateLEDState();
+  }
+}
+
+BLYNK_WRITE(V8) {
+  temperatureThreshold = param.asInt();
+  Blynk.virtualWrite(V9, temperatureThreshold);
+  if (autoMode) {
+    // If in auto mode, update the LED state when the threshold changes
+    updateLEDState();
+  }
 }
 
 BLYNK_CONNECTED() {
@@ -58,6 +63,10 @@ BLYNK_CONNECTED() {
 void myTimerEvent() {
   Blynk.virtualWrite(V2, millis() / 1000);
   sendSensor();
+  if (autoMode) {
+    // Update the LED state based on the temperature threshold in auto mode
+    updateLEDState();
+  }
 }
 
 void sendSensor() {
@@ -73,15 +82,26 @@ void sendSensor() {
   Blynk.virtualWrite(V5, t);
 }
 
+void updateLEDState() {
+  if (autoMode) {
+    // Check and update the LED state based on the temperature threshold
+    float t = dht.readTemperature();
+    if (!isnan(t) && t <= temperatureThreshold) {
+      digitalWrite(ledPin, HIGH);
+    } else {
+      digitalWrite(ledPin, LOW);
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
-  pinMode(5, OUTPUT);
+  pinMode(ledPin, OUTPUT); // Pin connected to the LED
   Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
   dht.begin();
   timer.setInterval(1000L, myTimerEvent);
-  // Initialize modeAuto and relay
-  modeAuto = false;
-  relay = false;
+  // Initialize autoMode
+  autoMode = false;
 }
 
 void loop() {
