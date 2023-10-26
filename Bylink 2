@@ -1,0 +1,137 @@
+/*************************************************************
+
+  This example shows how value can be pushed from Arduino to
+  the Blynk App.
+
+  WARNING :
+  For this example you'll need Adafruit DHT sensor libraries:
+    https://github.com/adafruit/Adafruit_Sensor
+    https://github.com/adafruit/DHT-sensor-library
+
+  App dashboard setup:
+    Value Display widget attached to V5
+    Value Display widget attached to V6
+ *************************************************************/
+
+/* Fill-in information from Blynk Device Info here */
+#define BLYNK_TEMPLATE_ID           "TMPL698vGEzgH"
+#define BLYNK_TEMPLATE_NAME         "Smart Relay"
+#define BLYNK_AUTH_TOKEN            "ZyHawzsAvGjrPyvM2NsjW-fTlFZ-27Qn"
+
+/* Comment this out to disable prints and save space */
+#define BLYNK_PRINT Serial
+
+
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+#include <DHT.h>
+
+// Your WiFi credentials.
+// Set password to "" for open networks.
+char ssid[] = "oki";
+char pass[] = "12345678";
+
+#define DHTPIN 2          // What digital pin we're connected to
+
+// Uncomment whatever type you're using!
+#define DHTTYPE DHT11     // DHT 11
+//#define DHTTYPE DHT22   // DHT 22, AM2302, AM2321
+//#define DHTTYPE DHT21   // DHT 21, AM2301
+
+DHT dht(DHTPIN, DHTTYPE);
+BlynkTimer timer;
+bool modeAuto, relay;
+
+BLYNK_WRITE (VO)
+{
+// Set incoming value from pin V0 to a variable 
+int value = param.asInt();
+
+// Update state
+Blynk.virtualWrite (V1, value); 
+Serial.println(value);
+  if (value == 0 && modeAuto == 0) { 
+   digitalWrite(18, 0); relay = 0;
+  } else if (value == 1 && modeAuto == 1) {
+   digitalWrite(18, 1); relay = 1;
+  }
+}
+
+ BLYNK_WRITE (V6)
+{
+  int value = param.asInt();
+// Set incoming value from pin V0 to a variable int value = param.asInt();
+// Update state
+  Blynk.virtualWrite (V7, value); 
+  Serial.println(value);
+  if (value == 0) {
+  modeAuto = 0; //relay = 0;
+  } else {
+    modeAuto = 1;
+  }
+}
+
+BLYNK_CONNECTED()
+{
+  // Change Web Link Button message to "Congratulations!"
+  Blynk.setProperty (V3, "offImageUrl","https://static-image.nyc3.cdn.digitaloceanspaces.com/general/fte/congratulations.png");
+  Blynk.setProperty (V3, "onImageUrl","https://static-image.nyc3.cdn.digitaloceanspaces.c om/general/fte/congratulations_pressed.png");
+  Blynk.setProperty (V3, "url", "https://docs.blynk. io/en/getting-started/what-do-i-need-to-blynk/how-quickstart-device-was-made");
+  }
+  // This function sends Arduino's uptime every second to Virtual Pin 2.
+  void myTimerEvent ()
+  {
+  // You can send any value at any time.
+  // Please don't send more that 10 values per second.
+  Blynk.virtualWrite (V2, millis() / 1000);
+  sendSensor();
+}
+
+// This function sends Arduino's up time every second to Virtual Pin (5).
+// In the app, Widget's reading frequency should be set to PUSH. This means
+// that you define how often to send data to Blynk App.
+void sendSensor()
+{
+  float h = dht.readHumidity();
+  float t = dht.readTemperature(); // or dht.readTemperature(true) for Fahrenheit
+
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+
+  if(modeAuto == 1 and t < 30.0){
+    digitalWrite(18, 0);
+  }
+  if(modeAuto == 1 and t > 30.0){
+    digitalWrite(18, 1);
+  }
+
+  }
+  // You can send any value at any time.
+  // Please don't send more that 10 values per second.
+  Blynk.virtualWrite(V4, h);
+  Blynk.virtualWrite(V5, t);
+}
+
+void setup()
+{
+  // Debug console
+  Serial.begin(115200);
+  pinMode (18, OUTPUT);
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  // You can also specify server:
+  //Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass, "blynk.cloud", 80);
+  //Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass, IPAddress(192,168,1,100), 8080);
+
+  dht.begin();
+
+  // Setup a function to be called every second
+  timer.setInterval(1000L, sendSensor);
+}
+
+void loop()
+{
+  Blynk.run();
+  timer.run();
+}
