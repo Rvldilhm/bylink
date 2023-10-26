@@ -1,0 +1,90 @@
+/* Fill-in information from Blynk Device Info here */
+#define BLYNK_TEMPLATE_ID "TMPL64kx7BMnh"
+#define BLYNK_TEMPLATE_NAME "relay"
+#define BLYNK_AUTH_TOKEN "M2laaUXwKszwPezQeVTfHx8VyNrFnRGk"
+
+/* Comment this out to disable prints and save space */
+#define BLYNK_PRINT Serial
+
+
+/* 
+   This is an ESP32 program for controlling a relay and monitoring temperature and humidity
+   using the Blynk app.
+*/
+
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+#include <DHT.h>
+
+char ssid[] = "ELIN";
+char pass[] = "@polije.ac.id";
+
+#define DHTPIN 4
+#define DHTTYPE DHT11
+
+DHT dht(DHTPIN, DHTTYPE);
+BlynkTimer timer;
+
+bool modeAuto = false;
+bool relay = false;
+
+BLYNK_WRITE(V0) {
+  int value = param.asInt();
+  Blynk.virtualWrite(V1, value);
+  Serial.println(value);
+  if (value == 0 && modeAuto == false) {
+    digitalWrite(5, LOW);
+    relay = false;
+  } else if (value == 1 && modeAuto == false) {
+    digitalWrite(5, HIGH);
+    relay = true;
+  }
+}
+
+BLYNK_WRITE(V6) {
+  int value = param.asInt();
+  Blynk.virtualWrite(V7, value);
+  Serial.println(value);
+  modeAuto = (value == 1);
+}
+
+BLYNK_CONNECTED() {
+  Blynk.setProperty(V3, "offImageUrl", "https://static-image.nyc3.cdn.digitaloceanspaces.com/general/fte/congratulations.png");
+  Blynk.setProperty(V3, "onImageUrl", "https://static-image.nyc3.cdn.digitaloceanspaces.com/general/fte/congratulations_pressed.png");
+  Blynk.setProperty(V3, "url", "https://docs.blynk.io/en/getting-started/what-do-i-need-to-blynk/how-quickstart-device-was-made");
+}
+
+void myTimerEvent() {
+  Blynk.virtualWrite(V2, millis() / 1000);
+  sendSensor();
+}
+
+void sendSensor() {
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+
+  Blynk.virtualWrite(V4, h);
+  Blynk.virtualWrite(V5, t);
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(5, OUTPUT);
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  dht.begin();
+  timer.setInterval(1000L, myTimerEvent);
+  // Initialize modeAuto and relay
+  modeAuto = false;
+  relay = false;
+}
+
+void loop() {
+  Blynk.run();
+  timer.run();
+}
